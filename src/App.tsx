@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { Category, CheckStatus } from './data/checks';
+import type { Category, CheckStatus, CheckResult } from './data/checks';
 import { checks as initialChecks, CATEGORIES } from './data/checks';
 import CategoryView from './components/CategoryView';
 import Overview from './components/Overview';
@@ -49,8 +49,8 @@ export default function App() {
   const [currentCheck, setCurrentCheck] = useState('');
   const [lastRunTime, setLastRunTime] = useState<string | null>(null);
 
-  const handleStatusChange = (id: string, status: CheckStatus) => {
-    setChecks(prev => prev.map(c => c.id === id ? { ...c, status } : c));
+  const handleStatusChange = (id: string, status: CheckStatus, result?: CheckResult) => {
+    setChecks(prev => prev.map(c => c.id === id ? { ...c, status, result } : c));
   };
 
   const handleRunAll = useCallback(async () => {
@@ -63,8 +63,8 @@ export default function App() {
       setProgress({ done: i, total: updated.length });
       try {
         const result = await runSearch(check.search, 8);
-        const sev = parseSeverity(result);
-        updated[i] = { ...check, status: severityToStatus(sev) };
+        const sev = parseSeverity(result, check.search);
+        updated[i] = { ...check, status: severityToStatus(sev), result: result ?? undefined };
         setChecks([...updated]);
       } catch {
         updated[i] = { ...check, status: 'unknown' };

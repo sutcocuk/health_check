@@ -1,6 +1,11 @@
 export type Severity = 'critical' | 'warning' | 'info' | 'ok' | 'na';
 
-export type CheckStatus = 'pass' | 'fail' | 'warn' | 'info' | 'unknown';
+export type CheckStatus = 'pass' | 'fail' | 'warn' | 'info' | 'unknown' | 'error';
+
+export interface CheckResult {
+  fields: { name: string }[];
+  rows: string[][];
+}
 
 export interface HealthCheck {
   id: string;
@@ -18,6 +23,7 @@ export interface HealthCheck {
   source: 'monitoring_console' | 'health_assistant' | 'smt' | 'ps_assessment';
   status: CheckStatus;
   checkNumber?: string;
+  result?: CheckResult;
 }
 
 export type Category =
@@ -604,7 +610,7 @@ export const checks: HealthCheck[] = [
   },
   {
     id: 'shp_to_shc_upgrade_opportunity',
-    title: 'Upgrade Opportunity: Search Head Pooling → Clustering',
+    title: 'Upgrade Opportunity: Search Head Pooling naar Clustering',
     category: 'Splunk Miscellaneous',
     description:
       'If you are using search head pooling and running Splunk Enterprise 6.2 or higher, migration to search head clustering is strongly recommended.',

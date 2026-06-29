@@ -55,7 +55,10 @@ export async function runSearch(spl: string, timeout = 30): Promise<SplunkResult
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), (timeout + 5) * 1000);
 
-    const resp = await fetch(`${base}/en-US/splunkd/__raw/services/search/jobs/export`, {
+    const url = `${base}/en-US/splunkd/__raw/services/search/jobs/export`;
+    console.log('[HealthCheck] POST', url, { csrfToken: csrfToken ? '✓' : '✗ MISSING' });
+
+    const resp = await fetch(url, {
       method: 'POST',
       credentials: 'include',
       signal: controller.signal,
@@ -68,7 +71,11 @@ export async function runSearch(spl: string, timeout = 30): Promise<SplunkResult
     });
     clearTimeout(timer);
 
-    if (!resp.ok) return null;
+    console.log('[HealthCheck] response status:', resp.status);
+    if (!resp.ok) {
+      console.error('[HealthCheck] request failed:', resp.status, resp.statusText);
+      return null;
+    }
 
     const text = await resp.text();
     const lines = text.trim().split('\n').filter(Boolean);
@@ -79,9 +86,12 @@ export async function runSearch(spl: string, timeout = 30): Promise<SplunkResult
     for (const line of lines) {
       try {
         const obj = JSON.parse(line);
-        if (obj.preview !== undefined) continue;
+        if (obj.preview === true) continue;
         if (obj.fields) fields = obj.fields;
         if (obj.result) {
+          if (fields.length === 0) {
+            fields = Object.keys(obj.result).map(name => ({ name }));
+          }
           const row = fields.map((f) => String(obj.result[f.name] ?? ''));
           rows.push(row);
         }
@@ -96,11 +106,22 @@ export async function runSearch(spl: string, timeout = 30): Promise<SplunkResult
   }
 }
 
-export function parseSeverity(result: SplunkResult | null): number {
+const DMC_PATTERNS = ['dmc_group', 'inputlookup dmc_', 'dmc_set_index', 'dmc_forwarder'];
+
+function usesDmc(spl: string): boolean {
+  const lower = spl.toLowerCase();
+  return DMC_PATTERNS.some(p => lower.includes(p));
+}
+
+export function parseSeverity(result: SplunkResult | null, spl = ''): number {
   if (!result) return -1;
 
-  // No results → unknown (can't determine status)
-  if (result.rows.length === 0) return -1;
+  if (result.rows.length === 0) {
+    // No results from a DMC-dependent search → unknown (DMC not configured)
+    if (usesDmc(spl)) return -1;
+    // No results from any other search → no problems found → pass
+    return 0;
+  }
 
   const sevIdx = result.fields.findIndex((f) => f.name === 'severity_level');
 

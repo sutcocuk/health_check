@@ -162,19 +162,22 @@ export function generatePdf(checks: HealthCheck[], splunkHost: string) {
     y = (doc as any).lastAutoTable.finalY + 6;
   }
 
-  // ── Failed & Warning details ──────────────────────────────────────────────
-  const issues = checks.filter(c => c.status === 'fail' || c.status === 'warn');
-  if (issues.length > 0) {
+  // ── Details: alle checks met resultaten ──────────────────────────────────
+  const withDetails = checks.filter(c =>
+    c.status !== 'unknown' && c.status !== 'error' &&
+    (c.status === 'fail' || c.status === 'warn' || (c.result && c.result.rows.length > 0))
+  );
+  if (withDetails.length > 0) {
     doc.addPage();
     let dy = 20;
 
     doc.setTextColor(30, 35, 50);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
-    doc.text('Details — Fails & Warnings', margin, dy);
+    doc.text('Details — Alle Checks', margin, dy);
     dy += 8;
 
-    for (const check of issues) {
+    for (const check of withDetails) {
       if (dy > 250) { doc.addPage(); dy = 20; }
 
       const [r, g, b] = STATUS_COLOR[check.status];
@@ -190,8 +193,45 @@ export function generatePdf(checks: HealthCheck[], splunkHost: string) {
       doc.setTextColor(80, 85, 100);
       const wrapped = doc.splitTextToSize(check.suggestedAction, contentW - 10);
       doc.text(wrapped, margin + 6, dy + 10);
-
       dy += 8 + wrapped.length * 4 + 4;
+
+      if (check.result && check.result.fields.length > 0 && check.result.rows.length > 0) {
+        if (dy > 235) { doc.addPage(); dy = 20; }
+        const maxRows = Math.min(check.result.rows.length, 10);
+        // Limit columns to 6 max to prevent overflow
+        const fields = check.result.fields.slice(0, 6);
+        const colCount = fields.length;
+        const tableW = contentW - 4;
+        const colW = Math.floor(tableW / colCount);
+
+        autoTable(doc, {
+          startY: dy,
+          margin: { left: margin + 4, right: margin },
+          tableWidth: tableW,
+          head: [fields.map(f => f.name)],
+          body: check.result.rows.slice(0, maxRows).map(row =>
+            fields.map((_, ci) => {
+              const val = String(row[ci] ?? '');
+              return val.length > 40 ? val.slice(0, 38) + '…' : val;
+            })
+          ),
+          columnStyles: Object.fromEntries(fields.map((_, i) => [i, { cellWidth: colW, fontSize: 6.5 }])),
+          headStyles: { fillColor: [50, 55, 80], textColor: [255,255,255], fontSize: 7, fontStyle: 'bold', cellPadding: 1.5 },
+          bodyStyles: { fontSize: 6.5, cellPadding: 1.5, overflow: 'hidden' },
+          alternateRowStyles: { fillColor: [248, 249, 252] },
+        });
+        dy = (doc as any).lastAutoTable.finalY + 2;
+        const extra = check.result.rows.length - maxRows;
+        if (extra > 0) {
+          doc.setFontSize(7);
+          doc.setTextColor(130, 130, 150);
+          doc.text(`+ ${extra} meer rijen`, margin + 4, dy + 3);
+          dy += 6;
+        }
+        dy += 4;
+      } else {
+        dy += 2;
+      }
     }
   }
 
