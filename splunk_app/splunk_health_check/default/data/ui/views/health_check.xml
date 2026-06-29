@@ -1,0 +1,20 @@
+<dashboard version="1.1" hideTitle="true">
+  <label>Splunk Health Check</label>
+  <row>
+    <panel>
+      <html>
+        <style>
+          .dashboard-body { padding: 0 !important; margin: 0 !important; }
+          .dashboard-row  { margin: 0 !important; padding: 0 !important; }
+          .dashboard-cell { padding: 0 !important; }
+          .panel-body     { padding: 0 !important; }
+          .panel-head     { display: none !important; }
+          .fieldset       { display: none !important; }
+          #root { min-height: calc(100vh - 56px); }
+        </style>
+        <div id="root"></div>
+        <script src="/static/app/splunk_health_check/app.js"></script>
+      </html>
+    </panel>
+  </row>
+</dashboard>

@@ -1,0 +1,15 @@
+<%inherit file="//referenced//base.html" />
+
+<%block name="title">Splunk Health Check</%block>
+
+<%block name="css">
+<style>
+  body, html { margin: 0; padding: 0; overflow: hidden; }
+  #root { height: calc(100vh - 40px); }
+</style>
+</%block>
+
+<%block name="content">
+<div id="root"></div>
+<script src="${make_url('/static/app/splunk_health_check/app.js')}"></script>
+</%block>

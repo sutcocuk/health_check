@@ -1,0 +1,5 @@
+[]
+access = read : [ * ], write : [ admin, power ]
+
+[views/health_check]
+access = read : [ * ]
