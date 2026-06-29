@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import type { HealthCheck, CheckStatus } from '../data/checks';
+import type { HealthCheck, CheckStatus, CheckResult } from '../data/checks';
 import { runSearch, parseSeverity, severityToStatus } from '../services/splunkApi';
 
 interface Props {
   check: HealthCheck;
-  onStatusChange: (id: string, status: CheckStatus) => void;
+  onStatusChange: (id: string, status: CheckStatus, result?: CheckResult) => void;
 }
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -15,10 +15,10 @@ const SOURCE_CLS: Record<string, string> = {
   smt: 'source-smt', ps_assessment: 'source-ps',
 };
 const STATUS_TEXT: Record<CheckStatus, string> = {
-  unknown: '— N/A', pass: '✓ PASS', warn: '⚠ WARN', fail: '✕ FAIL', info: 'ℹ INFO',
+  unknown: '— N/A', pass: '✓ PASS', warn: '⚠ WARN', fail: '✕ FAIL', info: 'ℹ INFO', error: '✕ ERROR',
 };
 const ICON_SYMBOL: Record<CheckStatus, string> = {
-  unknown: '·', pass: '✓', warn: '⚠', fail: '✕', info: 'ℹ',
+  unknown: '·', pass: '✓', warn: '⚠', fail: '✕', info: 'ℹ', error: '!',
 };
 
 export default function CheckCard({ check, onStatusChange }: Props) {
@@ -33,10 +33,14 @@ export default function CheckCard({ check, onStatusChange }: Props) {
     setRunning(true);
     try {
       const result = await runSearch(check.search, 20);
-      const sev    = parseSeverity(result);
-      onStatusChange(check.id, severityToStatus(sev));
+      if (result === null) {
+        onStatusChange(check.id, 'error');
+      } else {
+        const sev = parseSeverity(result, check.search);
+        onStatusChange(check.id, severityToStatus(sev), result);
+      }
     } catch {
-      onStatusChange(check.id, 'unknown');
+      onStatusChange(check.id, 'error');
     }
     setRunning(false);
     setLastRun(new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
@@ -54,7 +58,7 @@ export default function CheckCard({ check, onStatusChange }: Props) {
 
   const s = check.status;
   const flashColors: Record<CheckStatus, string> = {
-    fail: '#c0392b40', warn: '#e67e2240', pass: '#27ae6040', info: '#2980b940', unknown: 'transparent',
+    fail: '#c0392b40', warn: '#e67e2240', pass: '#27ae6040', info: '#2980b940', unknown: 'transparent', error: '#8b000040',
   };
 
   return (
@@ -118,6 +122,27 @@ export default function CheckCard({ check, onStatusChange }: Props) {
               <div className="detail-action">{check.suggestedAction}</div>
             </div>
           )}
+          {check.result && check.result.rows.length > 0 && (
+            <div className="result-wrap">
+              <div className="detail-label">Resultaten ({check.result.rows.length} rijen)</div>
+              <div className="result-table-wrap">
+                <table className="result-table">
+                  <thead>
+                    <tr>{check.result.fields.map(f => <th key={f.name}>{f.name}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {check.result.rows.slice(0, 20).map((row, ri) => (
+                      <tr key={ri}>{row.map((cell, ci) => <td key={ci}>{cell}</td>)}</tr>
+                    ))}
+                  </tbody>
+                </table>
+                {check.result.rows.length > 20 && (
+                  <div className="result-more">+ {check.result.rows.length - 20} meer rijen (zie volledig rapport)</div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="spl-wrap">
             <div className="detail-label">SPL Query</div>
             <button className={`btn-copy${copied ? ' copied' : ''}`} onClick={handleCopy}>
